@@ -8,11 +8,14 @@ then
 fi
 
 source "$rvm_scripts_path/base"
-source "$rvm_scripts_path/version"
+source "$rvm_scripts_path/functions/autolibs"
+source "$rvm_scripts_path/functions/detect/system"
+source "$rvm_scripts_path/functions/version"
+source "$rvm_scripts_path/functions/version-installed-when"
 
 version_for()
 {
-  typeset binary
+  \typeset binary
   binary=${1:-""}
   if
     builtin command -v "$binary" >/dev/null
@@ -25,58 +28,35 @@ version_for()
 
 info_system()
 {
+  source "$rvm_scripts_path/functions/detect/xcode"
+
   rvm_info="
   system:
-    uname:       \"${_system_info}\"
-    system:      \"$(__rvm_system_path - 99 )\"
-    bash:        \"$(command -v bash) => $(version_for bash)\"
-    zsh:         \"$(command -v zsh) => $(version_for zsh)\"
-"
-}
+    uname:        \"${_system_info}\"
+    name:         \"${_system_name}\"
+    version:      \"${_system_version}\"
+    architecture: \"${_system_arch}\"
+    bash:         \"$(command -v bash) => $(version_for bash)\"
+    zsh:          \"$(command -v zsh) => $(version_for zsh)\"
+    remote_path:  \"$(__rvm_system_path - 99 )\""
 
-print_part()
-{
-  (( $1 )) || return
-  typeset ret
-  ret="$1 $2"
-  (( $1 == 1 )) || ret="${ret}s"
-  printf "$ret "
+  [[ "$_system_name" == "OSX" ]] && rvm_info="${rvm_info}
+    xcode:        \"$(__rvm_detect_xcode_version)\""
+
+  rvm_info="${rvm_info}\n"
 }
 
 info_rvm()
 {
-  typeset installed_at years months days hours minutes seconds part
+  __rvm_autolibs_get
+  __rvm_autolibs_translate_description
+
   rvm_info="
   rvm:
-    version:      \"$(__rvm_version | \command \tr "\n" ' ' | __rvm_strip)\"
-"
-  rvm_info="${rvm_info}    updated:      \""
-  installed_at="$(\command \cat ${rvm_path}/installed.at)"
-  if
-    [[ -n "${installed_at:-}" ]] && (( installed_at ))
-  then
-    seconds="$(( $(__rvm_date +%s) - installed_at ))"
-    if
-      (( seconds ))
-    then
-      minutes="$(( seconds / 60 % 60 ))"
-      hours="$(( seconds / 3600 % 24 ))"
-      days="$(( seconds / 86400 % 31 ))"
-      months="$(( seconds / 2678400 % 12 ))"
-      years="$(( seconds / 31536000 ))"
-      seconds="$(( seconds % 60 ))"
-      for part in year month day hour minute second
-      do eval "rvm_info=\"\${rvm_info}\$(print_part \${${part}s} ${part})\""
-      done
-      rvm_info="${rvm_info}ago"
-    else
-      rvm_info="${rvm_info}just now"
-    fi
-  else
-    rvm_info="${rvm_info}can not read installation time\n"
-  fi
-  rvm_info="${rvm_info}\"
+    version:      \"${rvm_version}\"
+    updated:      \"$(__rvm_version_installed_when)\"
     path:         \"$rvm_path\"
+    autolibs:     \"[${rvm_autolibs_flag}] ${rvm_autolibs_flag_description}\"
 "
 }
 
@@ -98,7 +78,6 @@ info_ruby()
     patchlevel:   \"$(printf "%b" "${full_version}" | __rvm_sed 's/^.*(//' | __rvm_sed 's/).*$//')\"
     full_version: \"${full_version}\"
 "
-
 }
 
 info_homes()
@@ -143,23 +122,20 @@ info_debug()
 {
   rvm_info="
 
-$(__rvm_version)
+$(__rvm_print_headline)
   $("$rvm_scripts_path/info" "$rvm_ruby_string" "" )
   PATH:\n$(printf "%b" "$PATH" | __rvm_awk -F":" '{print $1":"$2":"$3":"$4":"$5}' )
   uname -a: ${_system_info}
-  permissions: $(\command \ls -la "$rvm_path" "$rvm_rubies_path")
+  permissions: $(__rvm_ls -la "$rvm_path" "$rvm_rubies_path")
 "
 
   if [[ "Darwin" == "${_system_type}" ]]
   then
     rvm_info="$rvm_info
-  uname -r: ${_system_version}
-  uname -m: ${_system_arch}
   sw_vers: $(sw_vers | \command \tr "\n" ',')
   ARCHFLAGS: ${ARCHFLAGS:-""}
   LDFLAGS: ${LDFLAGS:-""}
   CFLAGS: ${CFLAGS:-""}
-  /Developer/SDKs/*:$(/usr/bin/basename -a /Developer/SDKs/* | \command \tr "\n" ',')
 "
   fi
   for file_name in "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshenv"

@@ -2,7 +2,7 @@
 
 __rvm_env_string()
 {
-  typeset _string
+  \typeset _string
   _string="${GEM_HOME:-}"
   _string="${_string##*/}"
   printf "%b" "${_string:-system}\n"
@@ -10,7 +10,7 @@ __rvm_env_string()
 
 __rvm_expand_ruby_string()
 {
-  typeset string current_ruby
+  \typeset string current_ruby
 
   string="$1"
 
@@ -58,7 +58,7 @@ __rvm_expand_ruby_string()
 __rvm_become()
 {
   # set rvm_rvmrc_flag=0 to not create .rvmrc in random places of code
-  typeset string rvm_rvmrc_flag
+  \typeset string rvm_rvmrc_flag
   string="$1"
   rvm_rvmrc_flag=0
 
@@ -76,7 +76,7 @@ __rvm_become()
 
 __rvm_ensure_has_environment_files()
 {
-  typeset file_name variable value environment_id __path __gem_home
+  \typeset file_name variable value environment_id __path __gem_home
 
   __gem_home="${rvm_ruby_gem_home}"
   file_name="${__gem_home}/environment"
@@ -130,8 +130,8 @@ __rvm_with()
 
 __variables_definition()
 {
-  typeset -a __variables_list __array_list
-  typeset __method
+  \typeset -a __variables_list __array_list
+  \typeset __method
 
   __method="$1"
 
@@ -143,7 +143,7 @@ __variables_definition()
     rvm_18_flag rvm_19_flag rvm_20_flag rvm_21_flag
     rvm_force_autoconf_flag rvm_dump_environment_flag rvm_curl_flags rvm_rubygems_version
     rvm_verbose_flag rvm_debug_flag rvm_trace_flag __array_start rvm_skip_pristine_flag
-    rvm_pretty_print_flag rvm_create_flag rvm_remove_flag rvm_movable_flag rvm_archive_flag
+    rvm_create_flag rvm_remove_flag rvm_movable_flag rvm_archive_flag
     rvm_gemdir_flag rvm_reload_flag rvm_auto_reload_flag rvm_disable_binary_flag
     rvm_ignore_gemsets_flag rvm_skip_gemsets_flag rvm_install_on_use_flag rvm_remote_flag
     rvm_verify_downloads_flag rvm_skip_openssl_flag rvm_gems_cache_path rvm_gems_path
@@ -154,7 +154,7 @@ __variables_definition()
     rvm_wrappers_path rvm_stored_errexit rvm_ruby_strings rvm_ruby_binary
     rvm_ruby_gem_home rvm_ruby_home rvm_ruby_interpreter rvm_ruby_irbrc rvm_ruby_major_version
     rvm_ruby_minor_version rvm_ruby_package_name rvm_ruby_patch_level rvm_ruby_release_version
-    rvm_ruby_repo_url rvm_ruby_repo_branch rvm_ruby_revision rvm_ruby_tag rvm_ruby_sha
+    rvm_ruby_repo_url rvm_ruby_repo_branch rvm_ruby_revision rvm_ruby_tag rvm_ruby_sha rvm_ruby_repo_tag
     rvm_ruby_version rvm_ruby_package_file rvm_ruby_name rvm_ruby_name rvm_ruby_args
     rvm_ruby_user_tag rvm_ruby_patch detected_rvm_ruby_name __rvm_env_loaded next_token
     rvm_error_message rvm_gemset_name rvm_parse_break rvm_token rvm_action rvm_export_args
@@ -164,8 +164,8 @@ __variables_definition()
     rvm_without_gems rvm_with_gems rvm_with_default_gems
     rvm_ignore_dotfiles_flag rvm_fuzzy_flag rvm_autolibs_flag
     rvm_autolibs_flag_number rvm_autolibs_flag_runner rvm_quiet_curl_flag rvm_max_time_flag
-    rvm_error_clr   rvm_warn_clr   rvm_debug_clr   rvm_notify_clr   rvm_reset_clr
-    rvm_error_color rvm_warn_color rvm_debug_color rvm_notify_color rvm_reset_color
+    rvm_error_clr   rvm_warn_clr   rvm_debug_clr   rvm_notify_clr   rvm_code_clr    rvm_comment_clr     rvm_reset_clr
+    rvm_error_color rvm_warn_color rvm_debug_color rvm_notify_color rvm_code_color  rvm_comment_color   rvm_reset_color
     rvm_log_timestamp rvm_log_filesystem rvm_log_namelen rvm_show_log_lines_on_error
   )
 
@@ -174,8 +174,8 @@ __variables_definition()
   )
 
   case "${__method}" in
-    (export) export -a "${__array_list[@]}" || true ;;
-    (unset)  unset     "${__array_list[@]}" || true ;;
+    (export) true ;;
+    (unset)  unset "${__array_list[@]}" || true ;;
     (*)
       rvm_error "Unknown action given to __variables_definition: ${__method}"
       return 1
@@ -184,9 +184,9 @@ __variables_definition()
 
   ${__method} "${__variables_list[@]}" || true
 
-  # prevent errors with bash "set -a", see https://github.com/wayneeseguin/rvm/issues/2872
+  # prevent errors with bash "set -a", see https://github.com/rvm/rvm/issues/2872
   if [[ -n "${BASH_VERSION:-}" ]]
-  then export -fn __rvm_select_version_variables __rvm_ruby_string_parse_ __rvm_rm_rf_verbose __rvm_parse_args 2>/dev/null || true
+  then export -fn __rvm_select_version_variables __rvm_ruby_string_parse_ __rvm_rm_rf_verbose __rvm_parse_args __rvm_ruby_string_find __rvm_file_load_env __rvm_remove_without_gems 2>/dev/null || true
   fi
 }
 
@@ -202,9 +202,19 @@ __rvm_setup()
   then return 0
   fi
 
-  if [[ -n "${BASH_VERSION:-}" ]] && ! __function_on_stack cd pushd popd
+  if
+    [[ -n "${BASH_VERSION:-}" ]] && ! __function_on_stack cd pushd popd
   then
-    trap 'status=$? ; __rvm_teardown_final ; set +x ; return $status' 0 1 2 3 15
+    export rvm_shell_nounset
+
+    if __rvm_has_opt "nounset"
+    then rvm_bash_nounset=1
+    else rvm_bash_nounset=0
+    fi
+
+    set +o nounset
+    _rvm_old_traps=$( trap | __rvm_grep -E 'EXIT|HUP|INT|QUIT|TERM' || true )
+    trap '__rvm_teardown_final ; set +x' EXIT HUP INT QUIT TERM
   fi
 
   if [[ -n "${ZSH_VERSION:-}" ]]
@@ -239,13 +249,23 @@ __rvm_teardown()
   # decrease load count counter
   : __rvm_env_loaded:$(( __rvm_env_loaded-=1 )):
 
-  #skip teardown when already done or when not yet finished
+  # skip teardown when already done or when not yet finished
   if [[ -z "${rvm_tmp_path:-}" ]] || (( __rvm_env_loaded > 0 ))
   then return 0
   fi
 
-  if [[ -n "${BASH_VERSION:-}" ]]
-  then trap - 0 1 2 3 15 # Clear all traps, we do not want to go into an loop.
+  if
+    [[ -n "${BASH_VERSION:-}" ]]
+  then
+    trap - EXIT HUP INT QUIT TERM # Clear all traps, we do not want to go into an loop.
+    if
+      [[ -n "${_rvm_old_traps:-}" ]]
+    then
+      eval "${_rvm_old_traps}"
+    fi
+
+    (( rvm_bash_nounset == 1 )) && set -o nounset
+    unset rvm_bash_nounset
   fi
 
   if
@@ -275,6 +295,8 @@ __rvm_teardown()
   fi
 
   __variables_definition unset
+
+  unset _system_arch _system_name _system_type _system_version
 
   return 0
 }
@@ -317,7 +339,7 @@ __rvm_do_with_env_after()
 
 __rvm_do_with_env()
 {
-  typeset result
+  \typeset result
 
   __rvm_do_with_env_before
 
@@ -343,7 +365,7 @@ __rvm_ensure_is_a_function()
 {
   if [[ ${rvm_reload_flag:=0} == 1 ]] || ! is_a_function rvm
   then
-    for script in version functions/selector cd functions/cli cli override_gem
+    for script in functions/version functions/selector cd functions/cli cli override_gem
     do
       if [[ -f "$rvm_scripts_path/$script" ]]
       then

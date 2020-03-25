@@ -13,7 +13,7 @@ it can be either used directly as file, or hosted on a https server.
 
 You can also tell RVM to upload to scp server:
 
-    rvm prepare 1.9.3 -r rvm@rvm.io:~/shared/public/binaries
+    rvm prepare 1.9.3 -r rvm@ssh.rvm.io:~/shared/public/binaries
 
 It will show commands to run to update server, and changes for rvm files.
 
@@ -38,7 +38,7 @@ Where:
 - `rvm_system_server_path` - can be defined in `$rvm_path/user/db`, autodetected if not defined
 - `rvm_ruby_string` - is the name specified by user
 
-When coresponding path is not defined for url then it is autodetected.
+When corresponding path is not defined for url then it is autodetected.
 
 Example `$rvm_path/user/db`:
 

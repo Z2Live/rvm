@@ -27,7 +27,7 @@ requirements_rvm_pkg_libs_install()
 
 requirements_rvm_pkg_after_uniqe_paths()
 {
-  typeset __lib __lib_full_name
+  \typeset __lib __lib_full_name
   for __lib
   do
     __lib_full_name=$( requirements_rvm_pkg_config --list-all | __rvm_awk "/^${__lib}[- ]/{print \$1}" )
@@ -48,13 +48,15 @@ requirements_rvm_pkg_after_uniqe_paths()
 
 requirements_rvm_pkg_configure()
 {
-  typeset -a __packages
-  typeset __package
+  \typeset -a __packages
+  \typeset __package __target
+  __target="$1"
+  shift
   __rvm_read_lines __packages <(
     requirements_rvm_pkg_after_uniqe_paths "$@"
   )
   for __package in "${__packages[@]}"
-  do __rvm_update_configure_opt_dir "$1" "$__package"
+  do __rvm_update_configure_opt_dir "$__target" "$__package"
   done
 }
 ## common part of requirements_rvm_pkg_* extracted from scripts/functions/requirements/rvm_pkg <-
@@ -108,7 +110,7 @@ install_package()
       do
         __rvm_log_command "$package/patch" "Applying patch '$patch'..." __rvm_patch -p0 -f -i "$patch" ||
         {
-          typeset result=$?
+          \typeset result=$?
           rvm_error "Patch $patch did not apply cleanly... back to the patching board :("
           exit $result
         }
@@ -151,13 +153,13 @@ install_package()
       __rvm_cd "$rvm_src_path" &&
       __rvm_log_command "$package/rm_src.uninstall" "Removing ${package}-${version} from $rvm_src_path" \
         \command \rm -rf "$rvm_src_path/$package-$version" &&
-      "$rvm_scripts_path/db" "$rvm_path/config/packages" "${package}" delete
+      __rvm_db_ "$rvm_path/config/packages" "${package}" delete
     else
       __rvm_log_command "$package/make"         "Compiling $package in $rvm_src_path/$package-$version." \
         __rvm_make "${rvm_make_flags[@]}" &&
       __rvm_log_command "$package/make.install" "Installing $package to ${prefix_path:-$rvm_usr_path}" \
         __rvm_make install &&
-      "$rvm_scripts_path/db" "$rvm_path/config/packages" "${package}" "${version}"
+      __rvm_db_ "$rvm_path/config/packages" "${package}" "${version}"
     fi
   )
 
@@ -171,7 +173,7 @@ Please note that it's required to reinstall all rubies:
 
 package_installed()
 {
-  typeset __search_path __lib_file __extension
+  \typeset __search_path __lib_file __extension
   __search_path="${prefix_path:-${rvm_usr_path:-${rvm_path}/usr}}"
 
   [[ -f "${__search_path}/include/$1" ]] || return $?
@@ -225,7 +227,7 @@ install_curl()
 
 install_openssl()
 {
-  typeset -a openssl_use_asm
+  \typeset -a openssl_use_asm
   package="openssl" ; archive_format="tar.gz"
   openssl_use_asm=( "no-asm" )
   __rvm_db "${package}_version" "version"
@@ -277,8 +279,8 @@ install_openssl()
 update_openssl_certs()
 (
   __rvm_cd "$rvm_usr_path/ssl" &&
-  command curl -O http://curl.haxx.se/ca/cacert.pem &&
-  \command \mv cacert.pem cert.pem
+  __rvm_curl https://raw.githubusercontent.com/bagder/ca-bundle/master/ca-bundle.crt -o cert.pem ||
+  __rvm_curl https://curl.haxx.se/ca/cacert.pem -o cert.pem
 )
 openssl_installed()
 {

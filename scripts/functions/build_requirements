@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 
 source "$rvm_scripts_path/functions/build_requirements_helpers"
+source "$rvm_scripts_path/functions/build_undesired_helpers"
 
 __rvm_requirements_run()
 {
-  typeset -a packages_installed packages_missing packages_to_install packages_flags
-  typeset -a packages_custom packages_custom_after
-  typeset __type __lib_type __iterator
+  \typeset -a packages_installed packages_missing packages_to_install packages_flags
+  \typeset -a packages_undesired packages_to_remove
+  \typeset -a packages_custom packages_custom_after
+  \typeset __type __lib_type __iterator
   __type=$1
   __lib_type=$1
   shift
-  for __iterator in load reset before define summary update custom install custom_after after
+
+  for __iterator in load reset before define summary remove before_update update custom install custom_after after
   do
     __rvm_requirements_run_${__iterator} "$@" || return $?
   done
@@ -27,7 +30,7 @@ __rvm_requirements_run_load()
     [[ -s "$rvm_scripts_path/functions/requirements/${__type}" ]] ||
     {
       rvm_error "Requirements support for ${__type} is not implemented yet,
-report a bug here => https://github.com/wayneeseguin/rvm/issues"
+report a bug here => https://github.com/rvm/rvm/issues"
       return 1
     }
     source "$rvm_scripts_path/functions/requirements/${__type}"
@@ -49,6 +52,8 @@ __rvm_requirements_run_reset()
   packages_missing=()
   packages_to_install=()
   packages_flags=()
+  packages_undesired=()
+  packages_to_remove=()
   packages_custom=()
   packages_custom_after=()
 }
@@ -69,8 +74,8 @@ __rvm_requirements_run_before()
 
 __rvm_requirements_run_define()
 {
-  typeset -a list
-  typeset element __handler
+  \typeset -a list
+  \typeset element __handler
   if is_a_function requirements_${__lib_type}_define
   then __handler=requirements_${__lib_type}_define
   else __handler=requirements_${__type}_define
@@ -103,7 +108,7 @@ __rvm_requirements_run_summary_custom()
 
 __rvm_requirements_run_summary()
 {
-  typeset __summary_status=0
+  \typeset __summary_status=0
 
   (( ${#packages_custom[@]} == 0 )) ||
   {
@@ -113,15 +118,38 @@ __rvm_requirements_run_summary()
   }
   (( ${#packages_installed[@]} == 0 )) ||
   {
+    if (( ${rvm_list_installed_packages_flag:-0} == 1 ))
+    then
+      requirements_print_list ${packages_installed[*]}
+    fi
     _list="${packages_installed[*]}"
     rvm_debug "Found required packages: ${_list// /, }."
   }
   (( ${#packages_missing[@]} == 0 )) ||
   {
+    if (( ${rvm_list_missing_packages_flag:-0} == 1 ))
+    then
+      requirements_print_list ${packages_missing[*]}
+      __summary_status=1
+    else
     _list="${packages_missing[*]}"
     rvm_requiremnts_fail_or_run_action 2 \
       "Missing required packages: ${_list}" true ||
       __summary_status=$?
+    fi
+  }
+  (( ${#packages_undesired[@]} == 0 )) ||
+  {
+    if (( ${rvm_list_undesired_packages_flag:-0} == 1 ))
+    then
+      requirements_print_list ${packages_undesired[*]}
+      __summary_status=1
+    else
+    _list="${packages_undesired[*]}"
+    rvm_requiremnts_fail_or_run_action 2 \
+      "Found undesired packages: ${_list}" true ||
+      __summary_status=$?
+    fi
   }
   (( ${#packages_custom_after[@]} == 0 )) ||
   {
@@ -130,6 +158,14 @@ __rvm_requirements_run_summary()
       __summary_status=$?
   }
   return ${__summary_status}
+}
+
+__rvm_requirements_run_before_update()
+{
+  if is_a_function requirements_${__lib_type}_before_update
+  then requirements_${__lib_type}_before_update "$@" || return $?
+  fi
+  true # for osx
 }
 
 __rvm_requirements_run_update()
@@ -159,8 +195,8 @@ __rvm_requirements_run_update()
 
 __rvm_requirements_run_custom_()
 {
-  typeset __package __custom
-  typeset -a __missing_custom
+  \typeset __package __custom
+  \typeset -a __missing_custom
   __missing_custom=()
   __custom="$1"
   shift
@@ -207,7 +243,7 @@ __rvm_requirements_run_custom_()
 Can not find function 'requirements_${__lib_type}_install_${__custom}' to install missing ${__custom//_/ } packages:
    ${__missing_custom[*]}
 report a bug here:
-   https://github.com/wayneeseguin/rvm/issues
+   https://github.com/rvm/rvm/issues
 " || return $?
     fi
   fi
@@ -225,13 +261,13 @@ __rvm_requirements_run_install()
   if
     is_a_function requirements_${__lib_type}_lib_install
   then
-    typeset __package
+    \typeset __package
     for __package in "${packages_to_install[@]}"
     do
       __rvm_log_command package_install_${__package} "Installing required package: ${__package}" \
         "requirements_${__lib_type}_lib_install" "${__package}" ||
       {
-        typeset __status=$?
+        \typeset __status=$?
         _list="${packages_to_install[*]}"
         rvm_warn "Failed installation package: ${__package} of: ${_list// /, }."
         return ${__status}

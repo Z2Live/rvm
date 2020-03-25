@@ -2,7 +2,7 @@
 
 __rvm_ruby_string_fuzzy_remote()
 {
-  typeset new_ruby_string __search
+  \typeset new_ruby_string __search
   __search="${rvm_ruby_string}"
   if [[ -n "${rvm_ruby_name:-}" ]]
   then __search="${__search%${rvm_ruby_name:-}}.*${rvm_ruby_name:-}"
@@ -27,7 +27,7 @@ END{if (found) print found; else if (any) print any;}
 
 __rvm_ruby_string_fuzzy()
 {
-  typeset new_ruby_string __search
+  \typeset new_ruby_string __search
   __search="${rvm_ruby_string}"
   if [[ -n "${rvm_ruby_name:-}" ]]
   then __search="${__search%${rvm_ruby_name:-}}.*${rvm_ruby_name:-}"
@@ -46,7 +46,7 @@ __rvm_ruby_string_fuzzy()
 
 __rvm_ruby_string_parse_()
 {
-  typeset ruby_string gemset_name expanded_alias_name repo_url branch_name ruby_name
+  \typeset ruby_string gemset_name expanded_alias_name repo_url branch_name ruby_name tag_name
 
   # Stash the ruby string.
   ruby_string="${rvm_ruby_string:-}"
@@ -54,12 +54,15 @@ __rvm_ruby_string_parse_()
   repo_url="${rvm_ruby_repo_url:-}"
   branch_name="${rvm_ruby_repo_branch:-}"
   ruby_name="${rvm_ruby_name:-}"
+  tag_name="${rvm_ruby_repo_tag:-}"
 
   __rvm_unset_ruby_variables
 
   rvm_ruby_repo_url="${repo_url:-}"
   rvm_ruby_repo_branch="${branch_name:-}"
   rvm_ruby_name="$ruby_name"
+  rvm_ruby_repo_tag="${rvm_ruby_repo_tag:-}"
+
   export rvm_head_flag=0
 
   if
@@ -80,7 +83,7 @@ __rvm_ruby_string_parse_()
   __rvm_custom_separated_array strings - "${ruby_string}"
   rvm_ruby_string="${ruby_string}"
 
-  # +() in ZSH, see https://github.com/wayneeseguin/rvm/issues/2807
+  # +() in ZSH, see https://github.com/rvm/rvm/issues/2807
   if [[ -n "${ZSH_VERSION:-}" ]]
   then setopt LOCAL_OPTIONS KSH_GLOB
   fi
@@ -150,7 +153,7 @@ __rvm_ruby_string_parse_()
 
       ([0-9][0-9]*)
         case "${rvm_ruby_interpreter:-""}" in
-          (ree|kiji)
+          (ree)
             rvm_ruby_patch_level="$string"
             rvm_ruby_revision=""
             ;;
@@ -187,6 +190,10 @@ __rvm_ruby_string_parse_()
         rvm_ruby_sha="${string#s}"
         ;;
 
+      (tag[0-9])
+        rvm_ruby_repo_tag="$string"
+        ;;
+
       (tv[0-9]*|t[0-9]*)
         rvm_ruby_patch_level="" ; rvm_ruby_revision=""
         rvm_ruby_tag="$string"
@@ -210,7 +217,7 @@ __rvm_ruby_string_parse_()
         rvm_ruby_interpreter="rbx"
         ;;
 
-      (opal|ruby|rbx|jruby|macruby|ree|kiji|maglev|ironruby|goruby|mruby|tcs|jamesgolick|topaz)
+      (opal|ruby|rbx|jruby|macruby|ree|maglev|ironruby|mruby|topaz|truffleruby)
         rvm_ruby_interpreter="$string"
         ;;
 
@@ -228,7 +235,7 @@ __rvm_ruby_string_parse_()
     [[ -z "${rvm_ruby_interpreter}" && -n "${rvm_ruby_version}" ]]
   then
     case "${rvm_ruby_version}" in
-      (1.[5-7]*)    rvm_ruby_interpreter=jruby ;;
+      (1.[5-7]*|9*) rvm_ruby_interpreter=jruby ;;
       (1.[8-9]*|2*) rvm_ruby_interpreter=ruby  ;;
     esac
     if [[ -n "${rvm_ruby_interpreter}" ]]
@@ -240,7 +247,7 @@ __rvm_ruby_string_parse_()
 
 __rvm_ruby_string_latest()
 {
-  typeset check_ruby_string new_ruby_string
+  \typeset check_ruby_string new_ruby_string
   check_ruby_string=""
   if [[ -n "${rvm_ruby_interpreter}" ]]
   then check_ruby_string+="${rvm_ruby_interpreter}-"

@@ -13,7 +13,7 @@ __rvm_nuke_rvm_variables()
 __rvm_unset_ruby_variables()
 {
   # unset rvm_ruby_flag $(env | __rvm_awk -F= '/^rvm_ruby_/{printf $1" "}')
-  unset rvm_env_string rvm_ruby_string rvm_ruby_strings rvm_ruby_binary rvm_ruby_gem_home rvm_ruby_gem_path rvm_ruby_home rvm_ruby_interpreter rvm_ruby_irbrc rvm_ruby_log_path rvm_ruby_major_version rvm_ruby_minor_version rvm_ruby_package_name rvm_ruby_patch_level rvm_ruby_release_version rvm_ruby_repo_url rvm_ruby_repo_branch rvm_ruby_revision rvm_ruby_selected_flag rvm_ruby_tag rvm_ruby_version rvm_head_flag rvm_ruby_package_file rvm_ruby_configure rvm_ruby_name rvm_ruby_url rvm_ruby_global_gems_path rvm_ruby_args rvm_ruby_name rvm_llvm_flag
+  unset rvm_env_string rvm_ruby_string rvm_ruby_strings rvm_ruby_binary rvm_ruby_gem_home rvm_ruby_gem_path rvm_ruby_home rvm_ruby_interpreter rvm_ruby_irbrc rvm_ruby_log_path rvm_ruby_major_version rvm_ruby_minor_version rvm_ruby_package_name rvm_ruby_patch_level rvm_ruby_release_version rvm_ruby_repo_url rvm_ruby_repo_branch rvm_ruby_revision rvm_ruby_selected_flag rvm_ruby_tag rvm_ruby_version rvm_head_flag rvm_ruby_package_file rvm_ruby_configure rvm_ruby_name rvm_ruby_url rvm_ruby_global_gems_path rvm_ruby_args rvm_ruby_name rvm_llvm_flag rvm_ruby_repo_tag
   __rvm_load_rvmrc # restore important variables
 }
 
@@ -21,7 +21,7 @@ __rvm_unset_ruby_variables()
 # TODO: Should be able to...
 #   Unset both rvm variables as well as ruby-specific variables
 # Preserve gemset if 'rvm_sticky' is set
-# (persist gemset unless clear is explicitely called).
+# (persist gemset unless clear is explicitly called).
 __rvm_cleanse_variables()
 {
   __rvm_unset_ruby_variables
@@ -52,7 +52,7 @@ __rvm_conditionally_add_bin_path()
 
 __rvm_load_environment()
 {
-  typeset __hook
+  \typeset __hook
   if
     [[ -f "$rvm_environments_path/$1" ]]
   then
@@ -77,7 +77,7 @@ __rvm_load_environment()
 __rvm_export()
 {
   # extract the variable name from the first arg.
-  typeset name
+  \typeset name
   name=${1%%\=*}
 
   # store the current value, to be restored later.
@@ -90,28 +90,30 @@ __rvm_export()
 
 __rvm_unset_exports()
 {
-  typeset wrap_name name value
-  while IFS== read -d "" wrap_name value
+  \typeset wrap_name name value
+  \typeset -a __variables_list
+  __rvm_read_lines __variables_list <<< "$(
+    printenv | __rvm_sed '/^rvm_old_.*=/ { s/=.*$//; p; }; d;'
+  )"
+
+  for wrap_name in "${__variables_list[@]}"
   do
-    case "$wrap_name" in
-      rvm_old_*)
-        name=${wrap_name#rvm_old_}
-        if [[ -n "${value:-}" ]]
-        then export $name="${value}"
-        else unset $name
-        fi
-        unset $wrap_name
-        ;;
-    esac
-  done < <(printenv_null)
+    eval "value=\"\${${wrap_name}}\""
+    name=${wrap_name#rvm_old_}
+    if [[ -n "${value:-}" ]]
+    then export $name="${value}"
+    else unset $name
+    fi
+    unset $wrap_name
+  done
 }
 
 __rvm_fix_path_from_gem_path()
 {
   [[ -n "${GEM_PATH:-}" ]] || return 0
   export PATH
-  typeset IFS _iterator_path
-  typeset -a _gem_path _new_path
+  \typeset IFS _iterator_path
+  \typeset -a _gem_path _new_path
   IFS=:
   _gem_path=()
   _new_path=()
@@ -131,8 +133,9 @@ __rvm_fix_path_from_gem_path()
 # Clean all rvm items out of the current working path.
 __rvm_remove_rvm_from_path()
 {
-  typeset local_rvm_path
+  \typeset local_rvm_path
   __rvm_remove_from_path "${rvm_path%/}/*"
+  __rvm_remove_from_path "${rvm_gems_path%/}/*"
   __rvm_remove_from_path "${rvm_bin_path}"  #TODO: this might be dangerous if rvm is available in some common path
 
   while local_rvm_path="$( __rvm_which rvm 2>/dev/null )"
@@ -143,7 +146,7 @@ __rvm_remove_rvm_from_path()
 
 __rvm_switch()
 {
-  typeset new_rvm_path new_rvm_bin_path
+  \typeset new_rvm_path new_rvm_bin_path
 
   (( $# )) && [[ -z "$1" ]] && shift || true # skip first empty argument
   (( $# )) && [[ -n "$1" ]] && [[ -d "$1" || -d "${1%/*}" ]] && [[ ! -f "$1" ]] ||
@@ -177,8 +180,8 @@ __rvm_switch()
 
 __rvm_unload_action()
 {
-  typeset _element IFS
-  typeset -a _list
+  \typeset _element IFS
+  \typeset -a _list
 
   IFS=$'\n'
   _list=( $( \command \cat ${2:--} | sort -u ) )
@@ -197,8 +200,8 @@ __function_unset()
 
 __rvm_unload()
 {
-  typeset _element
-  typeset -a _list
+  \typeset _element
+  \typeset -a _list
 
   #PATH
   __rvm_remove_rvm_from_path
@@ -210,26 +213,26 @@ __rvm_unload()
   fi
 
   # aliases
-  __rvm_unload_action unalias  <(
+  __rvm_unload_action unalias <<< "$(
     if [[ -n "${ZSH_VERSION:-}" ]]
     then alias | __rvm_awk -F"=" '/rvm/ {print $1}'
     else alias | __rvm_awk -F"[= ]" '/rvm/ {print $2}'
     fi
-  )
+  )"
 
   # variables
-  __rvm_unload_action unset <(
+  __rvm_unload_action unset <<< "$(
     set |
       __rvm_awk -F"=" 'BEGIN{v=0;} /^[a-zA-Z_][a-zA-Z0-9_]*=/{v=1;} v==1&&$2~/^['\''\$]/{v=2;}
         v==1&&$2~/^\(/{v=3;} v==2&&/'\''$/&&!/'\'\''$/{v=1;} v==3&&/\)$/{v=1;} v{print;} v==1{v=0;}' |
       __rvm_awk -F"=" '/^[^ ]*(RUBY|GEM|IRB|gem|rubies|rvm)[^ ]*=/ {print $1} /^[^ ]*=.*rvm/ {print $1}' |
-      __rvm_grep -vE "^PROMPT|^prompt|^PS|^BASH_SOURCE"
-  )
+      __rvm_grep -vE "^PROMPT|^prompt|^PS|^BASH_SOURCE|^PATH"
+  )"
 
   # functions
-  __rvm_unload_action __function_unset <(
-    typeset -f | __rvm_awk '$2=="()" {fun=$1} /rvm/{print fun}' | sort -u | __rvm_grep -v __rvm_unload_action
-  )
+  __rvm_unload_action __function_unset <<< "$(
+    \typeset -f | __rvm_awk '$2=="()" {fun=$1} /rvm/{print fun}' | sort -u | __rvm_grep -v __rvm_unload_action
+  )"
   if
     [[ -n "${ZSH_VERSION:-}" ]]
   then
@@ -248,7 +251,7 @@ __rvm_unload()
 
 __rvm_ruby_config_get()
 {
-  typeset variable_name ruby_path
+  \typeset variable_name ruby_path
   variable_name="$1"
   ruby_path="${2:-$rvm_ruby_home/bin/ruby}"
   # mruby doesn't support -r requires or RbConfig
@@ -268,11 +271,11 @@ __rvm_env_print()
   environment_file_path="$rvm_environments_path/$(__rvm_env_string)"
   # Echo the path or environment file.
   if
-    [[ "$rvm_path_flag" == "1" || "$*" =~ "--path" ]]
+    [[ "$rvm_path_flag" == "1" || "$*" == *"--path"* ]]
   then
     echo "$environment_file_path"
   elif
-    [[ "$rvm_cron_flag" == "1" || "$*" =~ "--cron" ]]
+    [[ "$rvm_cron_flag" == "1" || "$*" == *"--cron"* ]]
   then
     \command \cat "$environment_file_path" |
       __rvm_grep -Eo "[^ ]+=[^;]+" |

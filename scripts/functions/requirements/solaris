@@ -1,17 +1,5 @@
 #!/usr/bin/env bash
 
-requirements_solaris_define()
-{
-  if
-    is_a_function requirements_solaris_${_system_version}_define
-  then
-    requirements_solaris_${_system_version}_define "$@" || return $?
-  else
-    rvm_error "Solaris ${_system_version} is not supported"
-    return 40
-  fi
-}
-
 requirements_solaris_lib_installed()
 {
   pkg info "$1" > /dev/null 2>&1 || return $?
@@ -31,7 +19,7 @@ requirements_solaris_libs_install()
 {
   __rvm_try_sudo pkg install "$@" ||
   {
-    typeset ret=$?
+    \typeset ret=$?
     case $ret in
       (4) return 0 ;; # means the package does not need updates
     esac
@@ -46,9 +34,9 @@ requirements_solaris_update_system()
       return 0
       ;;
     (*)
-      __rvm_try_sudo pkg refresh && __rvm_try_sudo pkg update ||
+      __rvm_try_sudo pkg refresh ||
       {
-        typeset ret=$?
+        \typeset ret=$?
         case $ret in
           (4) return 0 ;; # means nothing to install
         esac
@@ -62,7 +50,7 @@ requirements_solaris_check_custom()
 {
   for lib in "$@"
   do
-    [[ " ${packages_custom[*]} " =~ " $lib " ]] ||
+    [[ " ${packages_custom[*]} " == *" $lib "* ]] ||
     requirements_solaris_custom_lib_installed "$lib" || __rvm_add_once packages_custom "$lib"
   done
   unset lib
@@ -75,13 +63,56 @@ requirements_solaris_check_opencsw_enabled()
 
 requirements_solaris_enable_opencsw()
 {
-  __rvm_try_sudo pkgadd -a $rvm_path/config/solaris/noask -d http://get.opencsw.org/now CSWpkgutil > /dev/null 2>&1 || return $?
+  __rvm_try_sudo pkgadd -a $rvm_path/config/solaris/noask -d https://get.opencsw.org/now CSWpkgutil > /dev/null 2>&1 || return $?
 }
 
 requirements_solaris_install_custom()
 {
   requirements_solaris_check_opencsw_enabled || requirements_solaris_enable_opencsw
-  __rvm_try_sudo /opt/csw/bin/pkgutil -iy "$@" -t http://mirror.opencsw.org/opencsw/unstable || return $?
+  __rvm_try_sudo /opt/csw/bin/pkgutil -iy "$@" -t https://mirror.opencsw.org/opencsw/unstable || return $?
+}
+
+requirements_solaris_define()
+{
+  if
+    is_a_function requirements_solaris_${_system_version}_define
+  then
+    requirements_solaris_${_system_version}_define "$@" || return $?
+  else
+    rvm_error "Solaris ${_system_version} is not supported"
+    return 40
+  fi
+}
+
+requirements_solaris_11_update_after()
+{
+  __rvm_try_sudo pkg update "${packages_installed[@]}" ||
+  {
+    \typeset ret=$?
+    case $ret in
+      (4) return 0 ;; # means nothing to install
+    esac
+    return $ret
+  }
+}
+
+requirements_solaris_after()
+{
+  case "${_system_version}" in
+    (10)
+      return 0
+      ;;
+    (*)
+      if
+        [[ -n "${packages_installed[*]}" ]]
+      then
+        rvm_requiremnts_fail_or_run_action 3 \
+          "Updating installed packages: ${packages_installed[*]}" \
+          requirements_solaris_11_update_after ||
+          return $?
+      fi
+      ;;
+  esac
 }
 
 requirements_solaris_10_define()
@@ -90,33 +121,41 @@ requirements_solaris_10_define()
     (rvm)
       requirements_solaris_check_custom CSWbash CSWgit CSWgpatch CSWmd5deep CSWwhich
       ;;
+
     (jruby-head*)
-      requirements_solaris_check_custom git
+      requirements_solaris_check_custom git make
       ;;
+
     (jruby*)
       # JDK is already installed on Solaris 10
       # TODO: is ant installed also?
+      requirements_solaris_check_custom make
+
       if
         is_head_or_disable_binary "$1"
       then
-        requirements_check git
-        if is_jruby_post17 "$1"
-        then requirements_check_custom_after mvn=maven
-        fi
+        requirements_solaris_check_custom git
+        case $( jruby_installation_method  "$1" ) in
+          mvn) requirements_check_custom_after mvn=maven ;;
+        esac
       fi
       ;;
+
     (ir*)
       # No support
       true
       ;;
+
     (opal)
       # No support
       true
       ;;
+
     (*-head)
       requirements_solaris_check_custom CSWgpatch CSWgcc4core CSWgmake CSWcoreutils CSWpkgconfig CSWautoconf CSWautomake CSWlibtool CSWlibyaml-dev CSWlibreadline-dev CSWlibncurses-dev CSWlibssl-dev CSWcurl CSWgit
       __rvm_update_configure_opt_dir "$1" "/opt/csw"
       ;;
+
     (*)
       requirements_solaris_check_custom CSWgpatch CSWgcc4core CSWgmake CSWcoreutils CSWpkgconfig CSWautoconf CSWautomake CSWlibtool CSWlibyaml-dev CSWlibreadline-dev CSWlibncurses-dev CSWlibssl-dev CSWcurl
       __rvm_update_configure_opt_dir "$1" "/opt/csw"
@@ -141,10 +180,10 @@ requirements_solaris_11_define()
       then
         requirements_check jdk
         requirements_check_fallback git scmgit-base
-        if is_jruby_post17 "$1"
-        then requirements_check_custom_after mvn=maven
-        else requirements_check ant
-        fi
+        case $( jruby_installation_method  "$1" ) in
+          ant) requirements_check ant                    ;;
+          mvn) requirements_check_custom_after mvn=maven ;;
+        esac
       else
         requirements_check jdk
       fi

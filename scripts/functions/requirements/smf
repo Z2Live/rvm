@@ -7,7 +7,7 @@ requirements_find_smf()
   then
     return 0
   else # find SMF out of PATH and link to rvm/bin
-    typeset __binary
+    \typeset __binary
     for __binary in ~/.sm/bin/sm /opt/sm/bin/sm
     do
       if
@@ -49,19 +49,19 @@ requirements_smf_lib_install_command()
 
 requirements_smf_lib_install()
 {
-  typeset -a __smf_install_command
+  \typeset -a __smf_install_command
   requirements_smf_lib_install_command "$@"
   rvm_debug "__smf_install_command: ${__smf_install_command[*]};"
   "${__smf_install_command[@]}" ||
   {
-    typeset ret=$?
+    \typeset ret=$?
     rvm_warn "There were package installation errors with SM Framework, make sure to read the log.
-If you see this on OSX, then you might want to try macports (http://www.macports.org/) or homebrew (http://brew.sh/) and tell RVM to use them by running:
+If you see this on OSX, then you might want to try macports (https://www.macports.org/) or homebrew (http://brew.sh/) and tell RVM to use them by running:
 
     rvm autolibs macports #OR
     rvm autolibs homebrew
 
-You can get help using IRC: http://webchat.freenode.net/?channels=rvm"
+You might get help by reporting tickets to https://github.com/sm/sm/issues"
     return $ret
   }
   shift
@@ -85,7 +85,7 @@ requirements_smf_gcc_42_check()
 
 requirements_smf_install_extension_sets()
 {
-  typeset __set
+  \typeset __set
   for __set
   do __smf_try_sudo sm set install "${__set}" || return $?
   done
@@ -128,29 +128,36 @@ requirements_smf_define()
     (rvm)
       true
       ;;
+
     (jruby*)
+      requirements_check make
+
       if
         is_head_or_disable_binary "$1"
       then
         requirements_smf_define_git || return $?
-        if is_jruby_post17 "$1"
-        then requirements_check_custom_after mvn=maven
-        else __rvm_which ant >/dev/null 2>&1 || return $?
-        fi
+        case $( jruby_installation_method  "$1" ) in
+          ant) __rvm_which ant >/dev/null 2>&1 || return $? ;;
+          mvn) requirements_check_custom_after mvn=maven    ;;
+        esac
       fi
       __rvm_which java >/dev/null 2>&1 || return $?
       ;;
+
     (ir*)
       __rvm_which mono >/dev/null 2>&1 || return $?
       ;;
+
     (opal)
       required_extension_sets+=( javascript )
       requirements_check node
       ;;
+
     (*-head)
       requirements_smf_define default
       requirements_smf_define_git || return $?
       ;;
+
     (*)
       required_extension_sets+=( databases gnu libraries tools )
       if
@@ -195,7 +202,6 @@ requirements_smf_find_sm()
 
 requirements_smf_before()
 {
-  export -a required_extension_sets
   required_extension_sets=()
   requirements_smf_ensure_smf_available || return $?
   requirements_smf_find_sm              || return $?

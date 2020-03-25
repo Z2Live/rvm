@@ -2,8 +2,8 @@
 
 __rvm_load_rvmrc()
 {
-  typeset _file
-  typeset -a rvm_rvmrc_files
+  \typeset _file
+  \typeset -a rvm_rvmrc_files
   if (( ${rvm_ignore_rvmrc:=0} == 1 ))
   then
     return 0
@@ -39,6 +39,7 @@ Skipping the loading of $_file
 __rvm_initialize()
 {
   true ${rvm_scripts_path:="$rvm_path/scripts"}
+  export rvm_scripts_path
   source "$rvm_scripts_path/base"
 
   __rvm_conditionally_add_bin_path

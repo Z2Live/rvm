@@ -4,7 +4,7 @@ __rvm_select_rbx_nightly()
 {
   (( ${rvm_nightly_flag:=0} == 1 )) || return 0
 
-  typeset org_rvm_ruby_patch_level _rvm_ruby_name
+  \typeset org_rvm_ruby_patch_level _rvm_ruby_name
   if [[ "$rvm_ruby_version" == head ]]
   then rvm_ruby_version=""
   fi
@@ -82,7 +82,7 @@ __rvm_select_interpreter_rbx()
     if
       __rvm_version_compare "${rvm_ruby_version}" -ge "2.0.0"
     then
-      rbx_url="$( __rvm_db "rbx_2.0.0_url" )"
+      rbx_url="$( __rvm_db "rbx_url_2.0_and_newer" )"
       rvm_archive_extension="tar.bz2"
       rvm_ruby_package_file="rubinius-${rvm_ruby_version}"
       rvm_ruby_url="${rbx_url}/${rvm_ruby_package_file}.${rvm_archive_extension}"
@@ -93,7 +93,7 @@ __rvm_select_interpreter_rbx()
       rvm_ruby_url="${rbx_url}/$rvm_ruby_package_file.${rvm_archive_extension}"
     fi
   else
-    rvm_ruby_repo_url=${rvm_rbx_repo_url:-$(__rvm_db "rubinius_repo_url")}
+    rvm_ruby_repo_url=${rvm_rbx_repo_url:-$(__rvm_db "rbx_repo_url")}
     rvm_head_flag=1
     rvm_ruby_patch_level=""
     rvm_ruby_tag="${rvm_ruby_version:+v}${rvm_ruby_version:-}"
@@ -114,7 +114,7 @@ __rvm_select_interpreter_rubinius()
 
 __rvm_select_macruby_nightly_selected()
 {
-  typeset __string_version
+  \typeset __string_version
   __string_version="${rvm_ruby_version//./-}"
   __string_version="${__string_version#nightly_}"
 
@@ -124,7 +124,7 @@ __rvm_select_macruby_nightly_selected()
 
 __rvm_select_macruby_nightly_detect()
 {
-  typeset __string_version
+  \typeset __string_version
   rvm_ruby_version="$(
     __rvm_curl -s "$rvm_ruby_url" |
     __rvm_grep -oE "<a href=\"macruby_nightly-[^<]+\.pkg</a>" |
@@ -229,6 +229,59 @@ __rvm_select_interpreter_jruby()
 
   alias jruby_ng="jruby --ng"
   alias jruby_ng_server="jruby --ng-server"
+
+  true # for OSX
+}
+
+__rvm_truffleruby_set_version()
+{
+  if (( ${rvm_head_flag:=0} == 1 ))
+  then
+    rvm_ruby_version="head"
+    truffleruby_version="head"
+  else
+    rvm_ruby_version="${rvm_ruby_version:-$(__rvm_db "truffleruby_version")}"
+    truffleruby_version="${rvm_ruby_version}${rvm_ruby_patch_level:+-}${rvm_ruby_patch_level:-}"
+  fi
+
+  true # for OSX
+}
+
+__rvm_truffleruby_set_rvm_ruby_url()
+{
+  case "${_system_type}" in
+    Linux) platform="linux" ;;
+    Darwin) platform="macos" ;;
+    *) rvm_error "TruffleRuby does not support ${_system_type} currently." ;;
+  esac
+
+  case "${_system_arch}" in
+    x86_64) arch=amd64 ;;
+    *) rvm_error "TruffleRuby does not support ${_system_arch} currently." ;;
+  esac
+
+  rvm_ruby_package_name="truffleruby-${truffleruby_version}"
+
+  if (( ${rvm_head_flag:=0} == 1 )); then
+    case "$platform" in
+      linux) platform="ubuntu-18.04" ;;
+      macos) platform="macos-latest" ;;
+    esac
+
+    rvm_ruby_package_file="${rvm_ruby_package_name}-${platform}"
+    rvm_ruby_url="${rvm_ruby_repo_url:-https://github.com/ruby/truffleruby-dev-builder/releases/latest/download/${rvm_ruby_package_file}.tar.gz}"
+  else
+    rvm_ruby_package_file="${rvm_ruby_package_name}-${platform}-${arch}"
+    rvm_ruby_url="${rvm_ruby_repo_url:-$(__rvm_db "truffleruby_url")/vm-${truffleruby_version}/${rvm_ruby_package_file}.tar.gz}"
+  fi
+
+  true # for OSX
+}
+
+__rvm_select_interpreter_truffleruby()
+{
+  __rvm_truffleruby_set_version
+  __rvm_truffleruby_set_rvm_ruby_url
 
   true # for OSX
 }
@@ -344,18 +397,6 @@ __rvm_select_interpreter_topaz()
   __rvm_select_interpreter_common "topaz"
 }
 
-__rvm_select_interpreter_kiji()
-{
-  __rvm_select_interpreter_common "kiji"
-  rvm_ruby_string="kiji-head"
-}
-
-__rvm_select_interpreter_goruby()
-{
-  __rvm_select_interpreter_common "goruby"
-  rvm_ruby_string="goruby"
-}
-
 __rvm_select_interpreter_mruby()
 {
   rvm_ruby_interpreter="mruby"
@@ -377,21 +418,6 @@ __rvm_select_interpreter_mruby()
   fi
 }
 
-__rvm_select_interpreter_tcs()
-{
-  __rvm_select_interpreter_common "tcs"
-  rvm_ruby_string="tcs"
-  rvm_disable_binary_flag=1
-}
-
-__rvm_select_interpreter_jamesgolick()
-{
-  __rvm_select_interpreter_common "jamesgolick"
-  rvm_ruby_string="jamesgolick"
-  rvm_ruby_repo_branch="${rvm_ruby_repo_branch:-"$(__rvm_db "jamesgolick_repo_branch")"}"
-  rvm_disable_binary_flag=1
-}
-
 __rvm_select_interpreter_ruby()
 {
   if
@@ -402,8 +428,10 @@ __rvm_select_interpreter_ruby()
     rvm_ruby_patch_level=""
     rvm_ruby_string="${rvm_ruby_string%-p0}"
   fi
+
   rvm_ruby_package_name="${rvm_ruby_interpreter}-${rvm_ruby_version}${rvm_ruby_patch_level:+-}${rvm_ruby_patch_level:-}"
   rvm_ruby_package_file="${rvm_ruby_package_name}"
+
   if
     [[ -z "${rvm_ruby_version:-""}" ]] &&
     (( ${rvm_head_flag:=0} == 0 ))
@@ -411,6 +439,7 @@ __rvm_select_interpreter_ruby()
     rvm_error "Ruby version was not specified!"
   else
     rvm_ruby_repo_url="${rvm_ruby_repo_url:-"$(__rvm_db "ruby_repo_url")"}"
+
     if
       (( ${rvm_head_flag:=0} == 0 ))
     then
@@ -422,6 +451,7 @@ __rvm_select_interpreter_ruby()
       rvm_disable_binary_flag=1
     fi
   fi
+
   true # for OSX
 }
 

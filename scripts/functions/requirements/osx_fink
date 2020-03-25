@@ -7,7 +7,7 @@ requirements_find_osx_fink()
   then
     return 0
   else # find fink out of PATH and link to rvm/bin
-    typeset __binary
+    \typeset __binary
     for __binary in ~/sw/bin/fink ~/.sw/bin/fink /sw/bin/fink /usr/local/bin/fink
     do
       if
@@ -23,7 +23,7 @@ requirements_find_osx_fink()
 
 requirements_osx_fink_path()
 (
-  typeset fink_binary="$( __rvm_which fink )"
+  \typeset fink_binary="$( __rvm_which fink )"
   __rvm_readlink_deep fink_binary
   echo "${fink_binary%/bin/fink}"
 )
@@ -55,7 +55,7 @@ requirements_osx_fink_libs_install()
 {
   __rvm_fink_sudo fink --yes install "$@"  ||
   {
-    typeset ret=$?
+    \typeset ret=$?
     rvm_warn "There were package installation errors, make sure to read the log."
     return $ret
   }
@@ -84,14 +84,18 @@ requirements_osx_fink_gcc_version_detect()
     __rvm_version_compare "${_system_version}" -le 10.7
   then
     fink_libs+=( gcc46 )
-  else # 10.8+
-    fink_libs+=( gcc48 )
+  elif 
+    __rvm_version_compare "${_system_version}" -le 10.10
+  then 
+    _libs+=( gcc49 )
+  else # 10.10
+    fink_libs+=( gcc49 )
   fi
 }
 
 requirements_osx_fink_libs_default_tools()
 {
-  fink_libs+=( autoconf2.6 automake1.13 pkgconfig )
+  fink_libs+=( autoconf2.6 automake1.14 pkgconfig )
 
   if
     __rvm_version_compare "${_system_version}" -le 10.6
@@ -101,7 +105,7 @@ requirements_osx_fink_libs_default_tools()
 
   if
     ! __ruby_clang_ok "$1" &&
-    [[ -z "${selected_compiler}" || "${selected_compiler}" =~ "gcc-4.2" ]]
+    [[ -z "${selected_compiler}" || "${selected_compiler}" == *"gcc-4.2"* ]]
   then
     # install gcc only if no gcc-4.2 available, prevents problems with gcc-4.2 on OSX 10.6
     __rvm_which gcc-4.2 >/dev/null || requirements_osx_fink_gcc_version_detect
@@ -110,7 +114,7 @@ requirements_osx_fink_libs_default_tools()
 
 requirements_osx_fink_libs_default_libs()
 {
-  typeset __lib
+  \typeset __lib
 
   for __lib in libyaml readline6 libksba8 sqlite3
   do
@@ -136,7 +140,7 @@ requirements_osx_fink_libs_default()
 {
   # FIXME: what packages are needed for installation
   # lib search => http://pdb.finkproject.org/pdb/browse.php?summary=openssl
-  typeset -a fink_libs
+  \typeset -a fink_libs
   fink_libs=()
 
   requirements_osx_fink_libs_default_tools "$@" || return $?
@@ -151,27 +155,39 @@ requirements_osx_fink_define()
     (rvm)
       true
       ;;
+
     (jruby*)
+      requirements_check make
+
       if
         is_head_or_disable_binary "$1"
       then
         __rvm_which git >/dev/null || requirements_check git
-        if is_jruby_post17 "$1"
-        then requirements_check_custom_after mvn=maven
-        fi
+        case $( jruby_installation_method  "$1" ) in
+          mvn) requirements_check_custom_after mvn=maven ;;
+        esac
       fi
-      requiremnts_osx_java_fail  || return $?
+
+      requiremnts_osx_java_fail || return $?
       ;;
+
     (ir*)
       __rvm_which mono >/dev/null 2>&1 || return $?
       ;;
+
     (opal)
       requirements_check node
       ;;
+
+    (truffleruby*)
+      requirements_osx_fink_libs_default "$1"
+      ;;
+
     (*-head)
       __rvm_which git >/dev/null || requirements_check git
       requirements_osx_fink_libs_default "$1"
       ;;
+
     (*)
       requirements_osx_fink_libs_default "$1"
       ;;
@@ -180,7 +196,7 @@ requirements_osx_fink_define()
 
 requirements_osx_fink_libs_configure()
 {
-  typeset package fink_lib fink_lib_prefix
+  \typeset package fink_lib fink_lib_prefix
   package="$1"
 
   if
@@ -209,7 +225,7 @@ requirements_osx_fink_after_update_certs_openssl()
 
 requirements_osx_fink_install_fink()
 {
-  typeset fink_home fink_version
+  \typeset fink_home fink_version
   fink_version=0.34.8
   rvm_warn "About to install fink-${fink_version}, press ENTER to use default answers.
 Make sure to watch the graphical login, questions for X11 installation will appear!"

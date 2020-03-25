@@ -2,17 +2,17 @@
 
 is_a_function()
 {
-  typeset -f $1 >/dev/null 2>&1 || return $?
+  \typeset -f $1 >/dev/null 2>&1 || return $?
 }
 
 # Functions RVM is built on
 # __rvm_string_match <value> <string|glob>
 if
-  [[ -n "$ZSH_VERSION" ]]
+  [[ -n "${ZSH_VERSION:-}" ]]
 then
   __rvm_string_match()
   {
-    typeset _string _search
+    \typeset _string _search
     _string="$1"
     shift
     while (( $# ))
@@ -32,7 +32,7 @@ then
 else
   __rvm_string_match()
   {
-    typeset _string
+    \typeset _string
     _string="$1"
     shift
     while (( $# ))
@@ -48,7 +48,7 @@ fi
 
 __rvm_array_contains()
 {
-  typeset _search _iterator
+  \typeset _search _iterator
   _search="$1"
   shift
   for _iterator
@@ -62,8 +62,8 @@ __rvm_array_contains()
 
 __rvm_array_add_or_update()
 {
-  typeset _array_name _variable _separator _value _local_value
-  typeset -a _array_value_old _array_value_new
+  \typeset _array_name _variable _separator _value _local_value
+  \typeset -a _array_value_old _array_value_new
 
   _array_name="$1"
   _variable="$2"
@@ -96,8 +96,8 @@ __rvm_array_add_or_update()
 
 __rvm_array_prepend_or_ignore()
 {
-  typeset _array_name _variable _separator _value _prefix _local_value
-  typeset -a _array_value_old _array_value_new
+  \typeset _array_name _variable _separator _value _prefix _local_value
+  \typeset -a _array_value_old _array_value_new
 
   _array_name="$1"
   _variable="$2"
@@ -134,7 +134,7 @@ __rvm_array_prepend_or_ignore()
 # Assumes that filename is the first argument, all others are passed onto sed
 __rvm_sed_i()
 {
-  typeset _filename _executable
+  \typeset _filename _executable _user
   [[ -n "${1:-}" ]] || {
     rvm_debug "no file given for __rvm_sed_i"
     return 0
@@ -145,6 +145,7 @@ __rvm_sed_i()
   if [[ -x "${_filename}" ]]
   then _executable=true
   fi
+  _user="$( __rvm_statf "%u:%g" "%u:%g" "${_filename}" )"
 
   {
     __rvm_sed "$@" < "${_filename}" > "${_filename}.new" &&
@@ -154,12 +155,15 @@ __rvm_sed_i()
   if [[ -n "${_executable:-}" && ! -x "${_filename}" ]]
   then chmod +x "${_filename}"
   fi
+  if [[ "$_user" != "$( __rvm_statf "%u:%g" "%u:%g" "${_filename}" )" ]]
+  then chown "$_user" "${_filename}"
+  fi
 }
 
 # Drop in cd which _doesnt't_ respect cdpath
 __rvm_cd()
 {
-    typeset old_cdpath ret
+    \typeset old_cdpath ret
     ret=0
     old_cdpath="${CDPATH}"
     CDPATH="."
@@ -170,8 +174,8 @@ __rvm_cd()
 
 __rvm_setup_utils_functions()
 {
-  typeset gnu_tools_path gnu_prefix gnu_util
-  typeset -a gnu_utils gnu_missing
+  \typeset gnu_tools_path gnu_prefix gnu_util
+  \typeset -a gnu_utils gnu_missing
   gnu_utils=( awk cp date find sed tail tar xargs )
   gnu_missing=()
 
@@ -226,26 +230,45 @@ __rvm_setup_utils_functions_Solaris()
   then
     rvm_error "ERROR: Missing GNU tools: ${gnu_missing[@]}. Make sure they are installed in '$gnu_tools_path/' before using RVM!"
     if [[ "${_system_name} ${_system_version}" == "Solaris 10" ]]
-    then rvm_error "You might want to look at OpenCSW project to install the above mentioned tools (http://opencsw.org/about)"
+    then rvm_error "You might want to look at OpenCSW project to install the above mentioned tools (https://www.opencsw.org/about)"
     fi
     exit 200
   fi
 }
+
+__rvm_setup_utils_functions_OSX()
+{
+  if
+    [[ -x /usr/bin/stat ]]
+  then
+    __rvm_stat() { /usr/bin/stat "$@" || return $?; }
+  else
+    rvm_error "ERROR: Missing (executable) /usr/bin/stat. Falling back to '\\\\command \\\\stat' which might be something else."
+    __rvm_stat() { \command \stat "$@" || return $?; }
+  fi
+  __rvm_setup_utils_functions_common
+}
+
 __rvm_setup_utils_functions_Other()
 {
-  __rvm_grep() { GREP_OPTIONS="" \command \grep "$@" || return $?; }
   __rvm_stat() { \command \stat "$@" || return $?; }
+  __rvm_setup_utils_functions_common
+}
 
-  if command which --skip-alias --skip-functions which >/dev/null 2>&1
-  then __rvm_which() { command which --skip-alias --skip-functions "$@" || return $?; }
-  elif command which whence >/dev/null 2>&1 && command whence whence >/dev/null 2>&1
-  then __rvm_which() { command whence -p "$@" || return $?; }
-  elif command which which >/dev/null 2>&1
-  then __rvm_which() { command which "$@" || return $?; }
-  elif which which >/dev/null 2>&1
-  then __rvm_which() { which "$@" || return $?; }
+__rvm_setup_utils_functions_common()
+{
+  __rvm_grep() { GREP_OPTIONS="" \command \grep "$@" || return $?; }
+
+  if \command \which --skip-alias --skip-functions which >/dev/null 2>&1
+  then __rvm_which() { \command \which --skip-alias --skip-functions "$@" || return $?; }
+  elif \command \which whence >/dev/null 2>&1 && \command \whence whence >/dev/null 2>&1
+  then __rvm_which() { \command \whence -p "$@" || return $?; }
+  elif \command \which which >/dev/null 2>&1
+  then __rvm_which() { \command \which "$@" || return $?; }
+  elif \which which >/dev/null 2>&1
+  then __rvm_which() { \which "$@" || return $?; }
   else
-    typeset __result=$?
+    \typeset __result=$?
     rvm_error "ERROR: Missing proper 'which' command. Make sure it is installed before using RVM!"
     return ${__result}
   fi
@@ -256,6 +279,29 @@ __rvm_setup_utils_functions_Other()
 }
 
 __rvm_setup_utils_functions || return $?
+
+# detect system after setting up __rvm_sed and before setting up __rvm_statf
+source "${rvm_scripts_path}/functions/db"
+source "${rvm_scripts_path}/functions/detect/system"
+
+__rvm_setup_statf_function()
+{
+  if
+    [[ "${_system_type}" == Darwin || "${_system_type}" == BSD ]]
+  then
+    __rvm_statf()
+    {
+      __rvm_stat -f "$2" "$3"
+    }
+  else
+    __rvm_statf()
+    {
+      __rvm_stat -c "$1" "$3"
+    }
+  fi
+}
+
+__rvm_setup_statf_function || return $?
 
 
 __rvm_setup_sudo_function()
@@ -273,7 +319,7 @@ __rvm_setup_sudo_function_PCLinuxOS()
     if
       [[ "$1" == "-p" ]]
     then
-      printf "$2"
+      rvm_printf_to_stderr "${2//%p/[root]/}"
       shift 2
     fi
     su -c "$*"
@@ -288,6 +334,13 @@ __rvm_setup_sudo_function_Solaris()
     __rvm_sudo()
     {
       /opt/csw/bin/sudo "$@"
+    }
+  elif
+    [[ -x /usr/bin/sudo ]]
+  then
+    __rvm_sudo()
+    {
+      /usr/bin/sudo "$@"
     }
   else
     rvm_debug "Warning: No '/opt/csw/bin/sudo' found."
@@ -349,10 +402,10 @@ __rvm_curl_output_control()
   then
     __flags+=( "--silent" "--show-error" )
   elif
-    [[ " $*" =~ " -s" || " $*" =~ " --silent" ]]
+    [[ " $*" == *" -s"* || " $*" == *" --silent"* ]]
   then
     # make sure --show-error is used with --silent
-    [[ " $*" =~ " -S" || " $*" =~ " -sS" || " $*" =~ " --show-error" ]] ||
+    [[ " $*" == *" -S"* || " $*" == *" -sS"* || " $*" == *" --show-error"* ]] ||
     {
       __flags+=( "--show-error" )
     }
@@ -363,7 +416,7 @@ __rvm_curl_output_control()
 # -S is automatically added to -s
 __rvm_curl()
 (
-  typeset curl_path
+  \typeset curl_path
   if
     [[ "${_system_name} ${_system_version}" == "Solaris 10" ]] &&
     ! __rvm_which curl >/dev/null 2>&1
@@ -378,7 +431,7 @@ __rvm_curl()
     return 200
   }
 
-  typeset -a __flags
+  \typeset -a __flags
   __flags=( --fail --location )
 
   # allow overriding default 30 minutes for download, but should be plenty of time
@@ -404,12 +457,19 @@ __rvm_curl()
 
 is_parent_of()
 {
-  typeset name pid ppid pname
+  \typeset name pid ppid pname
   name=$1
   pid=$2
   while [[ -n "$pid" && "$pid" != "0" ]]
   do
-    read ppid pname < <(\command \ps -p $pid -o ppid= -o ucomm=)
+    case "`uname`" in
+      (SunOS)
+        read ppid pname <<<"$(\command \ps -p $pid -o ppid= -o comm=)"
+        ;;
+      (*)
+        read ppid pname <<<"$(\command \ps -p $pid -o ppid= -o ucomm=)"
+        ;;
+    esac
     if [[ -n "$ppid" && -n "$pname" ]]
     then
       if [[ "$pname" == "$name" ]]
@@ -428,11 +488,11 @@ is_parent_of()
 
 __rvm_string_includes()
 {
-  typeset __search __text="$1"
+  \typeset __search __text="$1"
   shift
   for __search in "$@"
   do
-    if [[ " ${__text} " =~ " ${__search} " ]]
+    if [[ " ${__text} " == *" ${__search} "* ]]
     then return 0
     fi
   done
@@ -447,7 +507,7 @@ __function_on_stack()
 # read lines from file / stdin(-)
 __rvm_read_lines()
 {
-  typeset IFS
+  \typeset IFS
   # NEW LINE, BE CAREFUL
   IFS="
 "
@@ -457,9 +517,28 @@ __rvm_read_lines()
   fi
 }
 
+__setup_lang_fallback()
+{
+  if
+    [[ -z "${LANG:-}" ]]
+  then
+    LANG="$(
+      {
+        locale -a | __rvm_grep "^en_US.utf8" ||
+        locale -a | __rvm_grep "^en_US" ||
+        locale -a | __rvm_grep "^en" ||
+        locale -a
+      } 2>/dev/null | \command \head -n 1
+    )"
+    : LANG=${LANG:=en_US.utf-8}
+    export LANG
+    rvm_warn "\$LANG was empty, setting up LANG=$LANG, if it fails again try setting LANG to something sane and try again."
+  fi
+}
+
 __rvm_ruby_config_save()
 {
-  typeset ruby_path
+  \typeset ruby_path
   ruby_path="${1:-$rvm_ruby_home/bin/ruby}"
   case "$ruby_path" in
     (*/mruby*)
@@ -478,13 +557,13 @@ __rvm_ruby_config_save_mruby()
 
 __rvm_ruby_config_save_generic()
 {
-  typeset config_path default_config_path
+  \typeset config_path default_config_path
   default_config_path="#{RbConfig::CONFIG[\"prefix\"]}/config"
   config_path="${1:-$default_config_path}"
   "$ruby_path" -rrbconfig -e '\
     File.open("'"$config_path"'","w") { |file|
       RbConfig::CONFIG.sort.each{|key,value|
-        file.write("#{key.gsub(/\.|-/,"_")}=\"#{value.gsub("$","\\$")}\"\n")
+        file.write("#{key.gsub(/\.|-/,"_")}=\"#{value.to_s.gsub("$","\\$")}\"\n")
       }
     }
   ' >/dev/null 2>&1
@@ -492,7 +571,7 @@ __rvm_ruby_config_save_generic()
 
 __rvm_record_ruby_configs()
 {
-  typeset __dir
+  \typeset __dir
   for __dir in "$rvm_path/rubies/"*
   do
     if
@@ -500,7 +579,7 @@ __rvm_record_ruby_configs()
     then
       __rvm_ruby_config_save "${__dir}/bin/ruby" "${__dir}/config" ||
       {
-        typeset string="${__dir##*/}"
+        \typeset string="${__dir##*/}"
         rvm_error "    Can not save config data for ruby: '${string}', most likely it is broken installation and you can:
     - try fix it: 'rvm reinstall ${string}', OR:
     - remove  it: 'rvm uninstall ${string} --gems'"
@@ -508,3 +587,5 @@ __rvm_record_ruby_configs()
     fi
   done
 }
+
+__rvm_ls() { \command \ls "$@" || return $?; }

@@ -4,39 +4,43 @@ source "$rvm_scripts_path/functions/osx-ssl-certs"
 
 make_sure_its_enough_ram_for_rbx()
 {
-  typeset rvm_rbx_required_ram
+  \typeset rvm_rbx_required_ram
   rvm_rbx_required_ram_mb=500
 
   __rvm_compiler_is_llvm ||
-  __rvm_is_enough_ram ${rvm_rbx_required_ram_mb} ||
-  rvm_error "For rbx (Rubinius) more than ${rvm_rbx_required_ram_mb}MB of free RAM might be required."
+    __rvm_is_enough_ram ${rvm_rbx_required_ram_mb} ||
+      rvm_error "For rbx (Rubinius) more than ${rvm_rbx_required_ram_mb}MB of free RAM might be required."
 }
 
 rubinius_install_detect_required_ruby()
 {
   export ruby
+
   case "${rvm_ruby_version}" in
     (2.0.0)
       case "${rvm_ruby_patch_level}" in
         (rc1) ruby="ruby-1.9" ;;
-        (*)   ruby="ruby-2"   ;;
+        (*)   ruby="ruby-2.2"   ;;
       esac
       ;;
-    (head)
+
+    (2*)
       case "$rvm_ruby_repo_branch" in
-        (1.8.7|1.9.3) ruby="ruby-1.9|ruby-2" ;;
-        (*)           ruby="ruby-2"          ;;
+        (1.8.7|1.9.3) ruby="ruby-1.9|ruby-2.2" ;;
+        (*)           ruby="ruby-2.2"          ;;
       esac
       ;;
+
     (*)
-      ruby="ruby-2"
+      ruby="ruby-2.3.1"
       ;;
   esac
-  __rvm_ensure_has_mri_ruby "$ruby" ||
-  {
-    rvm_log "No $ruby found, cannot build rbx."
-    return 1
+
+  __rvm_ensure_has_mri_ruby "$ruby" || {
+      rvm_log "No $ruby found, cannot build rbx."
+      return 1
   }
+
   ruby="$(__rvm_mri_ruby "$ruby")"
 }
 
@@ -63,7 +67,7 @@ rubinius_install_ensure_wrappers()
 {
   [[ -x "$rvm_wrappers_path/$ruby/ruby" && -x "$rvm_wrappers_path/$ruby/gem" ]] ||
     __rvm_log_command "gemset.wrappers.rubinius" "$ruby - #generating wrappers" \
-    run_gem_wrappers_regenerate ||
+    run_gem_wrappers regenerate ||
     return $?
   rubinius_install_ensure_gem rake || return $?
   rubinius_install_ensure_gem bundle bundler || return $?
@@ -88,8 +92,8 @@ rubinius_install()
 
   make_sure_its_enough_ram_for_rbx
 
-  typeset rvm_configure_args
-  typeset -a rvm_ruby_configure
+  \typeset rvm_configure_args
+  \typeset -a rvm_ruby_configure
   unset CFLAGS LDFLAGS ARCHFLAGS # Important.
   unset GEM_HOME GEM_PATH MY_RUBY_HOME IRBRC RBXOPT
   export PATH
@@ -98,6 +102,7 @@ rubinius_install()
   __rvm_setup_compile_environment "${rvm_ruby_string}" || return $?
   __rvm_remove_rvm_from_path
   __rvm_conditionally_add_bin_path
+
   rubinius_install_setup_ruby || return $?
 
   __rvm_fetch_ruby || return $?
@@ -112,12 +117,6 @@ rubinius_install()
     rvm_error "There has been an error while trying to apply patches to rubinius.  \nHalting the installation."
     return $result
   }
-  case "${_system_name}" in
-    Arch) true ;;
-    *)
-      (( ${#rvm_configure_flags[@]} )) || rvm_configure_flags=( --skip-system )
-      ;;
-  esac
   rvm_configure_flags=( --prefix="$rvm_ruby_home"  "${rvm_configure_flags[@]}" )
 
   __rvm_db "${rvm_ruby_interpreter}_configure_flags" "db_configure_flags"
@@ -148,6 +147,7 @@ rubinius_install()
   then rvm_ruby_make="CONFIGURE_ARGS=${rvm_configure_args## } "
   fi
 
+  __setup_lang_fallback
   __rvm_log_command rake "$rvm_ruby_string - #compiling" \
     "${rvm_ruby_make:-}$rvm_wrappers_path/$ruby/rake" install --trace ||
     return $?

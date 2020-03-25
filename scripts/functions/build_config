@@ -2,8 +2,8 @@
 
 __rvm_setup_compile_environment()
 {
-  typeset __type
-  typeset -a __types
+  \typeset __type
+  \typeset -a __types
   __types=(
     setup movable_early system_early requirements
     movable parse_name system architectures gcc47plus bison
@@ -19,12 +19,12 @@ __rvm_setup_compile_environment()
 
 __rvm_setup_compile_environment_setup()
 {
-  if [[ -z "${rvm_autolibs_flag:-}" ]]
-  then rvm_autolibs_flag="$( "$rvm_scripts_path/db" "$rvm_user_path/db" "autolibs" )"
-  fi
-  rvm_debug "rvm_autolibs_flag=${rvm_autolibs_flag:=4}"
+  __rvm_autolibs_get
+  rvm_debug "rvm_autolibs_flag=${rvm_autolibs_flag}"
+
   __rvm_autolibs_translate || return $?
   [[ -n "${rvm_autolibs_flag_number:-}" ]] || return $?
+
   export initially_selected_compiler="$( __rvm_selected_compiler )"
   true
 }
@@ -41,8 +41,15 @@ __rvm_setup_compile_environment_movable_early()
       case "$1" in
         ruby-2*|ruby-head*) true ;;
         (*)
-          rvm_error "Only MRI Ruby 2.0+ can be compiled movable with RVM on OSX"
-          return 2
+          if
+            (( ${rvm_force_flag:-0} > 0 ))
+          then
+            true # allow forcing installation of older rubies
+          else
+            rvm_error "Only MRI Ruby 2.0+ can be compiled movable with RVM on OSX,
+use '--force' if the binary will be moved to the same installation path."
+            return 2
+          fi
           ;;
       esac
       [[ "${rvm_autolibs_flag_runner}" == "smf" ]] ||
@@ -93,8 +100,8 @@ __rvm_setup_compile_environment_requirements()
   then
     rvm_log "Requirements installation successful."
   else
-    typeset __status=$?
-    rvm_error "Requirements installation failed with status: ${__status}."
+    \typeset __status=$?
+    [[ ${rvm_quiet_flag} == 1 ]] || rvm_error "Requirements installation failed with status: ${__status}."
     return ${__status}
   fi
 }
@@ -122,7 +129,6 @@ __rvm_setup_compile_environment_movable()
       ;;
   esac
   rvm_configure_flags+=( --sysconfdir=/etc )
-  rvm_make_flags+=( -j3 )
 }
 
 __rvm_setup_compile_environment_bison()
@@ -142,9 +148,9 @@ __rvm_setup_compile_environment_bison()
 
 __rvm_setup_compile_environment_architectures_osx_map()
 {
-  typeset _architecture
-  typeset _prefix="${1:-}"
-  typeset -a _architectures
+  \typeset _architecture
+  \typeset _prefix="${1:-}"
+  \typeset -a _architectures
   _architectures=()
   for _architecture in "${rvm_architectures[@]}"
   do
@@ -159,7 +165,7 @@ __rvm_setup_compile_environment_architectures_osx_map()
 
 __rvm_setup_compile_environment_architectures_ruby_osx()
 {
-  typeset -a _flags
+  \typeset -a _flags
   _flags=(
     MACOSX_DEPLOYMENT_TARGET="$( sw_vers -productVersion | __rvm_awk -F'.' '{print $1"."$2}' )"
     CFLAGS="$1 -g -Os -pipe -no-cpp-precomp"
@@ -199,7 +205,7 @@ __rvm_setup_compile_environment_architectures_Other()
     rvm_error "Only OSX supports fat binaries, any other system supports only single architecture, please be more specific."
     return 1
   }
-  typeset _architecture
+  \typeset _architecture
   case  "${rvm_architectures[*]}" in
     (i386)   _architecture=( -m32 ) ;;
     (x86_64) _architecture=( -m64 ) ;;
@@ -249,7 +255,7 @@ __rvm_setup_compile_environment_system()
 
 __rvm_setup_compile_environment_flags_docs()
 {
-  # disable docs, see https://github.com/wayneeseguin/rvm/issues/2656
+  # disable docs, see https://github.com/rvm/rvm/issues/2656
   # enable docs on OSX by default (that's development system)
   # if [[ "Darwin" == "${_system_type}" ]]
   # then : rvm_docs_flag=${rvm_docs_flag:=1}
@@ -294,7 +300,7 @@ __rvm_setup_compile_environment_flags_shared_static()
         ;;
       (*)
         rvm_configure_flags+=( --disable-shared )
-        __rvm_setup_compile_environment_flags_static_darwin LDFLAGS="-Bstatic"
+        __rvm_setup_compile_environment_flags_static_darwin LDFLAGS="-Bstatic -lz"
         ;;
     esac
   else
@@ -312,7 +318,8 @@ __rvm_setup_compile_environment_flags_shared_static()
         true # no flag yet for rbx, does not apply to jruby!
         ;;
       (*)
-        rvm_configure_flags+=( --enable-shared )
+        [[ "${rvm_configure_flags[*]}" == *--disable-shared* ]] ||
+          rvm_configure_flags+=( --enable-shared )
         ;;
     esac
   fi
@@ -322,11 +329,11 @@ __rvm_setup_compile_environment_flags_shared_static()
 __rvm_detect_max_threads()
 {
   case "${_system_name}" in
-    (Darwin|FreeBSD|DragonFly)
+    (OSX|Darwin|FreeBSD|DragonFly)
       if
         __rvm_which sysctl >/dev/null
       then
-        sysctl -n hw.ncpu
+        \command \sysctl -n hw.ncpu
       elif
         [[ -x /usr/sbin/sysctl ]]
       then
@@ -340,7 +347,7 @@ __rvm_detect_max_threads()
       fi
       ;;
     (*)
-      \command \cat /proc/cpuinfo 2>/dev/null | (\command \grep vendor_id || echo 'one';) | wc -l
+      \command \cat /proc/cpuinfo 2>/dev/null | (\command \grep vendor_id || \command \echo 'one';) | \command \wc -l
       ;;
   esac
 }
@@ -357,7 +364,7 @@ __rvm_setup_compile_environment_flags_threads()
       if [[ "${_system_name}" == "FreeBSD" || "${_system_name}" == "DragonFly" ]]
       then rvm_make_flags+=( -B )
       fi
-      if [[ " ${rvm_make_flags[*]}" =~ " -j" ]]
+      if [[ " ${rvm_make_flags[*]}" == *" -j"* ]]
       then rvm_warn "Found user configured '-j' flag in 'rvm_make_flags', please note that RVM can detect number of CPU threads and set the '-j' flag automatically if you do not set it."
       else rvm_make_flags+=( -j$(__rvm_detect_max_threads) )
       fi
